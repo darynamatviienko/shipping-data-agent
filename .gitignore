@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+.idea/
+.vscode/
+data/warehouse/*.duckdb
+data/warehouse/*.duckdb.wal
