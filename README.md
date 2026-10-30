@@ -18,13 +18,15 @@ tests/                     # Pytest suite
 python3 -m venv .venv
 make setup
 make data    # regenerate synthetic CSVs under data/raw/ (seed=42)
+make etl     # clean + load DuckDB warehouse under data/warehouse/
 make test
 ```
 
-Or run the generator directly:
+Or run the generator / ETL directly:
 
 ```bash
 .venv/bin/python scripts/generate_synthetic_data.py
+.venv/bin/python scripts/run_etl.py
 ```
 
 ### Raw CSVs (`data/raw/`)
@@ -37,6 +39,15 @@ Or run the generator directly:
 | `carrier_invoices.csv` | Carrier bills (`shipment_id`, `carrier`, `billed_price`, `invoice_date`) |
 | `carrier_invoices_labeled.csv` | Same invoices plus `error_type` labels (for later eval) |
 
-Roughly 3% of invoices carry deliberate faults: duplicate billing, wrong weight class, price above contract, or a billed shipment that does not exist.
+Roughly 3% of invoices carry deliberate faults: duplicate billing, wrong weight class, price above contract, or a billed shipment that does not exist. ETL keeps those rows so later agent tools can discover them; only structural bad data is rejected.
 
-Steps 3–7 (ETL, agent tools, LangGraph graph, evaluation, CLI/UI) come later.
+### Warehouse (`data/warehouse/`)
+
+| Artifact | Role |
+|----------|------|
+| `shipping.duckdb` | Star schema: `fact_shipments`, `fact_invoices`, `fact_contract_rates`, `dim_carrier`, `dim_country`, `dim_date` |
+| `rejected_rows.csv` | Rows dropped during cleaning (`_source`, `_reason`, `_row_number` + original columns) |
+
+`make etl` is idempotent (tables are replaced each run).
+
+Steps 4–7 (agent tools, LangGraph graph, evaluation, CLI/UI) come later.

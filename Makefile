@@ -1,14 +1,17 @@
 .PHONY: setup data etl test run
 
+PYTHON := .venv/bin/python
+export PYTHONPATH := src
+
 setup:
 	@test -d .venv || python3 -m venv .venv
 	.venv/bin/pip install -r requirements.txt
 
 data:
-	.venv/bin/python scripts/generate_synthetic_data.py
+	$(PYTHON) scripts/generate_synthetic_data.py
 
 etl:
-	@echo "Step 3 will implement ETL"
+	$(PYTHON) scripts/run_etl.py
 
 test:
 	.venv/bin/pytest
