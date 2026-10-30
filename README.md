@@ -50,4 +50,18 @@ Roughly 3% of invoices carry deliberate faults: duplicate billing, wrong weight 
 
 `make etl` is idempotent (tables are replaced each run).
 
-Steps 4–7 (agent tools, LangGraph graph, evaluation, CLI/UI) come later.
+### Agent tools (`src/shipping_data_agent/tools/`)
+
+| Tool | Role |
+|------|------|
+| `run_sql(query)` | Single read-only `SELECT` / `WITH … SELECT`; rejects writes & multi-statements; row limit + timeout |
+| `get_schema()` | Table/column descriptions for the star schema |
+| `find_invoice_discrepancies()` | Curated SQL for the four injected invoice faults; returns a summary table |
+
+```bash
+.venv/bin/python -c "from shipping_data_agent.tools import find_invoice_discrepancies; print(find_invoice_discrepancies())"
+```
+
+LangChain wrappers via `build_langchain_tools()` (no agent graph yet — Step 5).
+
+Steps 5–7 (LangGraph graph, evaluation, CLI/UI) come later.
