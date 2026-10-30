@@ -105,6 +105,26 @@ def export_graph_mermaid(**kwargs: Any) -> str:
     return app.get_graph().draw_mermaid()
 
 
+def ask_state(
+    question: str,
+    *,
+    db_path: Path | None = None,
+    llm: BaseChatModel | None = None,
+    llm_factory: Callable[[], BaseChatModel] | None = None,
+    row_limit: int = DEFAULT_ROW_LIMIT,
+    timeout_ms: int = DEFAULT_TIMEOUT_MS,
+) -> AgentState:
+    """Run one question through the agent graph and return the final state."""
+    app = build_agent_graph(
+        db_path=db_path if db_path is not None else DEFAULT_DB_PATH,
+        llm=llm,
+        llm_factory=llm_factory,
+        row_limit=row_limit,
+        timeout_ms=timeout_ms,
+    )
+    return app.invoke({"question": question})
+
+
 def ask(
     question: str,
     *,
@@ -115,12 +135,12 @@ def ask(
     timeout_ms: int = DEFAULT_TIMEOUT_MS,
 ) -> str:
     """Run one question through the agent graph and return the final answer text."""
-    app = build_agent_graph(
-        db_path=db_path if db_path is not None else DEFAULT_DB_PATH,
+    final = ask_state(
+        question,
+        db_path=db_path,
         llm=llm,
         llm_factory=llm_factory,
         row_limit=row_limit,
         timeout_ms=timeout_ms,
     )
-    final: AgentState = app.invoke({"question": question})
     return str(final.get("answer") or "").strip()

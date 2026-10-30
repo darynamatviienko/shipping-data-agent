@@ -7,11 +7,13 @@ AI agent for shipment Q&A and invoice error checks.
 ```
 src/shipping_data_agent/   # Python package
   agent/                   # LangGraph graph (Step 5)
+  eval/                    # 15-question bank + grading harness (Step 6)
   tools/                   # Read-only SQL / schema / discrepancy tools
   etl/                     # Cleaning + DuckDB load
-scripts/                   # Data generation, ETL, ask_agent
+scripts/                   # Data generation, ETL, ask_agent, run_eval
 data/raw/                  # Source CSVs (Step 2)
 data/warehouse/            # DuckDB warehouse (Step 3)
+data/eval/                 # Eval results JSON
 tests/                     # Pytest suite
 ```
 
@@ -23,6 +25,7 @@ make setup
 make data    # regenerate synthetic CSVs under data/raw/ (seed=42)
 make etl     # clean + load DuckDB warehouse under data/warehouse/
 make test
+make eval    # SQL ground truth always; live agent scoring when .env has keys
 ```
 
 Copy `.env.example` → `.env` and set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (plus optional `LLM_PROVIDER=anthropic|openai`). Keys are never hardcoded.
@@ -55,7 +58,7 @@ print(ask("What is the average delivery days by carrier?"))
 | `carriers.csv` | Carrier master data |
 | `contract_rates.csv` | Contract rates by carrier / country / weight band |
 | `carrier_invoices.csv` | Carrier bills (`shipment_id`, `carrier`, `billed_price`, `invoice_date`) |
-| `carrier_invoices_labeled.csv` | Same invoices plus `error_type` labels (for later eval) |
+| `carrier_invoices_labeled.csv` | Same invoices plus `error_type` labels (reference; eval uses warehouse SQL) |
 
 Roughly 3% of invoices carry deliberate faults: duplicate billing, wrong weight class, price above contract, or a billed shipment that does not exist. ETL keeps those rows so later agent tools can discover them; only structural bad data is rejected.
 
@@ -112,4 +115,50 @@ flowchart TD
   summarise --> fin
 ```
 
-Steps 6–7 (evaluation harness, Streamlit UI) come later.
+## Evaluation (Step 6)
+
+Fifteen fixed questions with answers computed directly in SQL against DuckDB. The harness runs the LangGraph agent (when LLM keys are set), grades free-text answers against those ground-truth values, and reports accuracy, failed cases, and average SQL retries.
+
+### How to run
+
+```bash
+cp -n .env.example .env   # set ANTHROPIC_API_KEY or OPENAI_API_KEY
+make etl                 # ensure warehouse exists
+make eval                # live agent scoring when keys present
+# or ground-truth only (no LLM):
+.venv/bin/python scripts/run_eval.py --ground-truth-only
+```
+
+Results JSON: `data/eval/results.json` (last run: `2026-10-30T15:50:57.989695+00:00`).
+
+### Latest metrics
+
+Live agent scoring was **not** run (no `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in `.env`). Question bank + SQL ground truth are shipped; re-run `make eval` after adding keys to fill accuracy / retries.
+
+| Metric | Value |
+|--------|-------|
+| Questions | 15 |
+| Accuracy | _pending live run_ |
+| Failed | _pending live run_ |
+| Average SQL retries | _pending live run_ |
+| LLM configured | False |
+
+### Question bank (SQL ground truth)
+
+| ID | Intent | Question | Expected (from DuckDB) |
+|----|--------|----------|------------------------|
+| `q01_shipment_count` | sql_qa | How many shipments are in the warehouse? | `20000` |
+| `q02_delivered_germany` | sql_qa | How many shipments were delivered to Germany? | `1472` |
+| `q03_invoice_count` | sql_qa | How many invoices are there? | `19679` |
+| `q04_total_billed` | sql_qa | What is the total billed amount across all invoices in EUR, rounded to 2 decimal places? | `624580.26` |
+| `q05_avg_delivery_by_carrier` | sql_qa | What is the average delivery_days by carrier, excluding cancelled shipments, rounded to 2 decimals? | `carrier_id=DHL, avg_delivery_days=6.68; carrier_id=FDX, avg_delivery_days=6.57; carrier_id=GLS, avg_delivery_days=6.65; carrier_id=TNT, avg_delivery_days=6.6; carrier_id=UPS, avg_delivery_days=6.56` |
+| `q06_top_carriers_by_shipments` | sql_qa | List the top 5 carriers by shipment count with their counts. | `carrier_id=FDX, shipment_count=4068; carrier_id=TNT, shipment_count=4002; carrier_id=UPS, shipment_count=3998; carrier_id=DHL, shipment_count=3979; carrier_id=GLS, shipment_count=3953` |
+| `q07_delayed_count` | sql_qa | How many shipments have status delayed? | `1437` |
+| `q08_avg_weight` | sql_qa | What is the average shipment weight_kg, rounded to 2 decimals? | `16.74` |
+| `q09_carrier_dim_count` | sql_qa | How many carriers are in the carrier dimension? | `5` |
+| `q10_shipments_2024` | sql_qa | How many shipments were shipped in calendar year 2024? | `10109` |
+| `q11_dhl_invoices` | sql_qa | How many invoices were billed by DHL? | `3929` |
+| `q12_top_parcel_type` | sql_qa | What is the most common parcel_type and how many shipments use it? | `parcel_type=medium_box, n=5981` |
+| `q13_max_weight` | sql_qa | What is the maximum shipment weight_kg, rounded to 2 decimals? | `119.99` |
+| `q14_contract_rate_rows` | sql_qa | How many contract rate rows are in the warehouse? | `250` |
+| `q15_invoice_discrepancies` | invoice_check | Find invoice discrepancies and report the count for each error type (duplicate_billing, wrong_weight_class, price_above_contract, nonexistent_shipment). | `duplicate_billing=292, nonexistent_shipment=145, price_above_contract=145, wrong_weight_class=146` |

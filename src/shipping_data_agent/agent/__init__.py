@@ -2,6 +2,7 @@
 
 from shipping_data_agent.agent.graph import (
     ask,
+    ask_state,
     build_agent_graph,
     export_graph_mermaid,
 )
@@ -15,6 +16,7 @@ from shipping_data_agent.agent.routing import (
 __all__ = [
     "Intent",
     "ask",
+    "ask_state",
     "build_agent_graph",
     "classify_intent",
     "classify_intent_heuristic",

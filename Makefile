@@ -1,4 +1,4 @@
-.PHONY: setup data etl test ask run
+.PHONY: setup data etl test ask eval run
 
 PYTHON := .venv/bin/python
 export PYTHONPATH := src
@@ -20,6 +20,11 @@ test:
 ask:
 	@test -n "$(Q)" || (echo 'Usage: make ask Q="your question"'; exit 1)
 	$(PYTHON) scripts/ask_agent.py "$(Q)"
+
+# Step 6: live agent scoring when .env has API keys; else SQL ground truth only.
+# Pass EXTRA='--live' to require keys, or EXTRA='--ground-truth-only' to skip LLM.
+eval:
+	$(PYTHON) scripts/run_eval.py --update-readme $(EXTRA)
 
 run:
 	@echo "Step 7 will implement the full CLI/UI; for now use: make ask Q='...'"
