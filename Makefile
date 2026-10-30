@@ -26,5 +26,6 @@ ask:
 eval:
 	$(PYTHON) scripts/run_eval.py --update-readme $(EXTRA)
 
+# Step 7: Streamlit chat UI (requires .env API key + warehouse from make etl).
 run:
-	@echo "Step 7 will implement the full CLI/UI; for now use: make ask Q='...'"
+	.venv/bin/streamlit run scripts/streamlit_app.py

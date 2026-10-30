@@ -1,118 +1,110 @@
 # Shipping Data Agent
 
-AI agent for shipment Q&A and invoice error checks.
+Natural-language Q&A over a synthetic parcel-shipping warehouse, plus invoice-discrepancy checks. A LangGraph agent turns questions into guarded DuckDB SQL (or a curated discrepancy tool), summarises the result in plain English, and refuses when the warehouse cannot answer.
+
+## Problem statement
+
+Carrier operations teams need fast answers from shipment and invoice data — “how many delayed DHL parcels to Germany?”, “which invoices look wrong?” — without writing SQL or trusting an unconstrained LLM. This project builds a **read-only** agent on synthetic CSVs loaded into DuckDB: clean ETL, schema-aware SQL generation with validation and retries, specialist invoice-fault detection, offline evaluation against SQL ground truth, and a simple CLI + Streamlit chat UI.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph ingest [Data]
+    CSV[Synthetic CSVs<br/>data/raw]
+    ETL[ETL cleaning]
+    DB[(DuckDB warehouse<br/>data/warehouse)]
+    CSV --> ETL --> DB
+  end
+
+  subgraph agent [LangGraph agent]
+    U[understand_question]
+    U -->|sql_qa| S[get_schema → write_sql<br/>→ validate → execute<br/>≤2 retries]
+    U -->|invoice_check| D[find_invoice_discrepancies]
+    U -->|unanswerable| R[refuse]
+    S --> Sum[summarise]
+    D --> Sum
+  end
+
+  subgraph ui [Interfaces]
+    CLI[CLI ask_agent.py]
+    ST[Streamlit chat]
+  end
+
+  LLM[LLM: Gemini / Anthropic / OpenAI]
+  Eval[15-question eval harness]
+
+  CLI --> U
+  ST --> U
+  S --> DB
+  D --> DB
+  U -.-> LLM
+  S -.-> LLM
+  Sum -.-> LLM
+  Eval --> agent
+  Eval --> DB
+```
+
+| Layer | Role |
+|-------|------|
+| `data/raw` + `scripts/generate_synthetic_data.py` | ~20k shipments, carriers, contract rates, invoices (~3% injected faults) |
+| `src/.../etl` | Clean + load star schema into DuckDB |
+| `src/.../tools` | Read-only `run_sql`, `get_schema`, `find_invoice_discrepancies` |
+| `src/.../agent` | Explicit LangGraph: understand → SQL path or discrepancy → summarise/refuse |
+| `src/.../eval` | 15 fixed questions graded against DuckDB SQL answers |
+| CLI / Streamlit | Ask questions without writing Python |
+
+## How to run (3 commands)
+
+```bash
+cp -n .env.example .env   # set GEMINI_API_KEY=… (or GOOGLE_API_KEY / Anthropic / OpenAI)
+make setup && make data && make etl
+make run                  # Streamlit chat at http://localhost:8501
+```
+
+That is enough for a working UI. Useful alternatives:
+
+```bash
+make ask Q='How many shipments were delivered to Germany?'
+.venv/bin/python scripts/ask_agent.py --interactive
+make eval                 # live scoring when keys present; else SQL ground truth only
+make test
+```
+
+### Gemini API key
+
+1. Copy `.env.example` → `.env`.
+2. Set **`LLM_PROVIDER=gemini`** (already the example default).
+3. Set **`GEMINI_API_KEY=`** *or* **`GOOGLE_API_KEY=`** (the factory accepts either; do not commit real keys).
+4. Optional: `GEMINI_MODEL=gemini-2.0-flash` (default).
+
+Anthropic (`ANTHROPIC_API_KEY`) and OpenAI (`OPENAI_API_KEY`) paths still work if you set `LLM_PROVIDER` accordingly. Keys are never hardcoded.
+
+## Example Q&A
+
+| Question | Expected behaviour |
+|----------|--------------------|
+| *How many shipments were delivered to Germany?* | SQL analytics → count from `fact_shipments` (ground truth **1472**) |
+| *Find invoice discrepancies and summarise the error types* | Routes to `find_invoice_discrepancies` (duplicate / wrong weight / over-contract / nonexistent) |
+| *What is the weather in Berlin?* | **Refuse** — warehouse cannot answer |
+
+```bash
+make ask Q='Find invoice discrepancies and summarise the error types'
+```
 
 ## Layout
 
 ```
-src/shipping_data_agent/   # Python package
-  agent/                   # LangGraph graph (Step 5)
-  eval/                    # 15-question bank + grading harness (Step 6)
-  tools/                   # Read-only SQL / schema / discrepancy tools
-  etl/                     # Cleaning + DuckDB load
-scripts/                   # Data generation, ETL, ask_agent, run_eval
-data/raw/                  # Source CSVs (Step 2)
-data/warehouse/            # DuckDB warehouse (Step 3)
-data/eval/                 # Eval results JSON
-tests/                     # Pytest suite
-```
-
-## Quick start
-
-```bash
-python3 -m venv .venv
-make setup
-make data    # regenerate synthetic CSVs under data/raw/ (seed=42)
-make etl     # clean + load DuckDB warehouse under data/warehouse/
-make test
-make eval    # SQL ground truth always; live agent scoring when .env has keys
-```
-
-Copy `.env.example` → `.env` and set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (plus optional `LLM_PROVIDER=anthropic|openai`). Keys are never hardcoded.
-
-### Ask a sample question (Step 5)
-
-```bash
-# Invoice discrepancy route
-make ask Q='Find invoice discrepancies and summarise the error types'
-
-# SQL analytics route
-.venv/bin/python scripts/ask_agent.py "How many shipments were delivered to Germany?"
-
-# Print the compiled graph as Mermaid
-.venv/bin/python scripts/ask_agent.py --print-diagram
-```
-
-Or from Python:
-
-```python
-from shipping_data_agent.agent import ask
-print(ask("What is the average delivery days by carrier?"))
-```
-
-### Raw CSVs (`data/raw/`)
-
-| File | Role |
-|------|------|
-| `shipments.csv` | ~20k shipments (`id`, `date`, `carrier`, `country`, `weight_kg`, `parcel_type`, `status`, `delivery_days`) |
-| `carriers.csv` | Carrier master data |
-| `contract_rates.csv` | Contract rates by carrier / country / weight band |
-| `carrier_invoices.csv` | Carrier bills (`shipment_id`, `carrier`, `billed_price`, `invoice_date`) |
-| `carrier_invoices_labeled.csv` | Same invoices plus `error_type` labels (reference; eval uses warehouse SQL) |
-
-Roughly 3% of invoices carry deliberate faults: duplicate billing, wrong weight class, price above contract, or a billed shipment that does not exist. ETL keeps those rows so later agent tools can discover them; only structural bad data is rejected.
-
-### Warehouse (`data/warehouse/`)
-
-| Artifact | Role |
-|----------|------|
-| `shipping.duckdb` | Star schema: `fact_shipments`, `fact_invoices`, `fact_contract_rates`, `dim_carrier`, `dim_country`, `dim_date` |
-| `rejected_rows.csv` | Rows dropped during cleaning (`_source`, `_reason`, `_row_number` + original columns) |
-
-`make etl` is idempotent (tables are replaced each run).
-
-### Agent tools (`src/shipping_data_agent/tools/`)
-
-| Tool | Role |
-|------|------|
-| `run_sql(query)` | Single read-only `SELECT` / `WITH … SELECT`; rejects writes & multi-statements; row limit + timeout |
-| `get_schema()` | Table/column descriptions for the star schema |
-| `find_invoice_discrepancies()` | Curated SQL for the four injected invoice faults; returns a summary table |
-
-```bash
-.venv/bin/python -c "from shipping_data_agent.tools import find_invoice_discrepancies; print(find_invoice_discrepancies())"
-```
-
-### LangGraph agent (`src/shipping_data_agent/agent/`)
-
-Explicit nodes:
-
-1. **understand_question** — classify as `invoice_check`, `sql_qa`, or `unanswerable`
-2. **run_discrepancy** — invoice audits call `find_invoice_discrepancies`
-3. **get_schema → write_sql → validate_sql → execute_sql** — analytics path using Step 4 tools
-4. **maybe_retry_gate / bump_retry** — on SQL guard or execution errors, retry writing SQL up to **2** times with the error message
-5. **summarise** — plain-English answer; SQL analytics answers always show the SQL used
-6. **refuse** — if the question cannot be answered from the warehouse, say so (no guessing)
-
-Compiled graph (from `export_graph_mermaid()` / `scripts/ask_agent.py --print-diagram`):
-
-```mermaid
-flowchart TD
-  start([start]) --> understand_question
-  understand_question -->|sql_qa| get_schema
-  understand_question -->|invoice_check| run_discrepancy
-  understand_question -->|unanswerable| refuse
-  get_schema --> write_sql --> validate_sql
-  validate_sql -->|ok| execute_sql
-  validate_sql -->|unsupported| summarise
-  validate_sql -->|error| maybe_retry_gate
-  execute_sql -->|ok| summarise
-  execute_sql -->|error| maybe_retry_gate
-  maybe_retry_gate -->|retries remaining| bump_retry --> write_sql
-  maybe_retry_gate -->|retries exhausted| summarise
-  run_discrepancy --> summarise
-  refuse --> fin([end])
-  summarise --> fin
+src/shipping_data_agent/
+  agent/     # LangGraph + LLM factory (Anthropic / OpenAI / Gemini)
+  eval/      # 15-question bank + grading harness
+  tools/     # Read-only SQL / schema / discrepancy tools
+  etl/       # Cleaning + DuckDB load
+scripts/     # generate_synthetic_data, run_etl, ask_agent, run_eval, streamlit_app
+data/raw/    # Source CSVs
+data/warehouse/  # DuckDB + rejected_rows.csv
+data/eval/   # Eval results JSON
+tests/
 ```
 
 ## Evaluation (Step 6)
@@ -122,18 +114,18 @@ Fifteen fixed questions with answers computed directly in SQL against DuckDB. Th
 ### How to run
 
 ```bash
-cp -n .env.example .env   # set ANTHROPIC_API_KEY or OPENAI_API_KEY
+cp -n .env.example .env   # set GEMINI_API_KEY (or ANTHROPIC/OPENAI)
 make etl                 # ensure warehouse exists
 make eval                # live agent scoring when keys present
 # or ground-truth only (no LLM):
 .venv/bin/python scripts/run_eval.py --ground-truth-only
 ```
 
-Results JSON: `data/eval/results.json` (last run: `2026-10-30T15:50:57.989695+00:00`).
+Results JSON: `data/eval/results.json`.
 
 ### Latest metrics
 
-Live agent scoring was **not** run (no `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in `.env`). Question bank + SQL ground truth are shipped; re-run `make eval` after adding keys to fill accuracy / retries.
+Live agent scoring was **not** run (no Gemini / Anthropic / OpenAI key in `.env`). Question bank + SQL ground truth are shipped; re-run `make eval` after adding keys to fill accuracy / retries.
 
 | Metric | Value |
 |--------|-------|
@@ -162,3 +154,20 @@ Live agent scoring was **not** run (no `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in
 | `q13_max_weight` | sql_qa | What is the maximum shipment weight_kg, rounded to 2 decimals? | `119.99` |
 | `q14_contract_rate_rows` | sql_qa | How many contract rate rows are in the warehouse? | `250` |
 | `q15_invoice_discrepancies` | invoice_check | Find invoice discrepancies and report the count for each error type (duplicate_billing, wrong_weight_class, price_above_contract, nonexistent_shipment). | `duplicate_billing=292, nonexistent_shipment=145, price_above_contract=145, wrong_weight_class=146` |
+
+## Limitations
+
+- Live accuracy / retry metrics are **pending** until an API key is added and `make eval` is re-run.
+- Heuristic intent routing can misclassify edge-case questions; LLM classification helps only when a key is set.
+- SQL answers depend on the model writing valid, schema-aligned SELECT statements (guards + ≤2 retries mitigate but do not eliminate failures).
+- Synthetic data and a fixed seed — not production carrier feeds.
+- Streamlit UI is a thin chat shell (no auth, history persistence, or multi-user sessions).
+- Single local DuckDB file; no concurrent write workload design.
+
+## What I would do next
+
+1. Run live eval with Gemini and tune prompts / few-shots until accuracy is interview-ready.
+2. Persist chat history and show the SQL / tool used under each answer in the UI.
+3. Add a small retrieval or schema-card cache so write_sql stays stable as the warehouse grows.
+4. Expand the discrepancy tool with dollar impact and shipment-level drill-down.
+5. Package as a small Docker Compose stack (warehouse volume + Streamlit) for demos.

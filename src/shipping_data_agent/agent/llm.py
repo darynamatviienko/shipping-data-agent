@@ -13,21 +13,32 @@ class LlmConfigError(RuntimeError):
     """Raised when no usable LLM provider/key is configured."""
 
 
+def _gemini_api_key() -> str | None:
+    """Return Gemini key from GEMINI_API_KEY or GOOGLE_API_KEY (either accepted)."""
+    return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or None
+
+
 def llm_configured() -> bool:
     """Return True when at least one supported API key is present."""
     load_dotenv()
-    return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"))
+    return bool(
+        os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+        or _gemini_api_key()
+    )
 
 
 def _resolve_provider() -> str:
     load_dotenv()
     explicit = (os.getenv("LLM_PROVIDER") or "").strip().lower()
-    if explicit in {"anthropic", "openai"}:
+    if explicit in {"anthropic", "openai", "gemini"}:
         return explicit
     if os.getenv("ANTHROPIC_API_KEY"):
         return "anthropic"
     if os.getenv("OPENAI_API_KEY"):
         return "openai"
+    if _gemini_api_key():
+        return "gemini"
     return "anthropic"
 
 
@@ -49,11 +60,26 @@ def get_chat_model() -> BaseChatModel:
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         return ChatOpenAI(model=model, api_key=api_key, temperature=0)
 
+    if provider == "gemini":
+        api_key = _gemini_api_key()
+        if not api_key:
+            raise LlmConfigError(
+                "LLM_PROVIDER=gemini but neither GEMINI_API_KEY nor "
+                "GOOGLE_API_KEY is set. Copy .env.example to .env and add a key."
+            )
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        return ChatGoogleGenerativeAI(
+            model=model, google_api_key=api_key, temperature=0
+        )
+
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise LlmConfigError(
             "LLM_PROVIDER=anthropic (default) but ANTHROPIC_API_KEY is not set. "
-            "Copy .env.example to .env and add a key, or set LLM_PROVIDER=openai."
+            "Copy .env.example to .env and add a key, or set "
+            "LLM_PROVIDER=openai|gemini."
         )
     from langchain_anthropic import ChatAnthropic
 

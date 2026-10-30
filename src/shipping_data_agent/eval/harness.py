@@ -96,7 +96,8 @@ def run_eval(
     do_live = keys_ok if live is None else bool(live)
     if do_live and not keys_ok:
         raise RuntimeError(
-            "Live eval requested but no ANTHROPIC_API_KEY / OPENAI_API_KEY found. "
+            "Live eval requested but no LLM API key found "
+            "(GEMINI_API_KEY / GOOGLE_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY). "
             "Copy .env.example → .env and set a key."
         )
 
@@ -198,7 +199,7 @@ def format_readme_section(report: EvalReport) -> str:
         "### How to run",
         "",
         "```bash",
-        "cp -n .env.example .env   # set ANTHROPIC_API_KEY or OPENAI_API_KEY",
+        "cp -n .env.example .env   # set GEMINI_API_KEY (or ANTHROPIC/OPENAI)",
         "make etl                 # ensure warehouse exists",
         "make eval                # live agent scoring when keys present",
         "# or ground-truth only (no LLM):",
@@ -250,10 +251,9 @@ def format_readme_section(report: EvalReport) -> str:
     else:
         lines.extend(
             [
-                "Live agent scoring was **not** run (no `ANTHROPIC_API_KEY` / "
-                "`OPENAI_API_KEY` in `.env`). Question bank + SQL ground truth are "
-                "shipped; re-run `make eval` after adding keys to fill accuracy / "
-                "retries.",
+                "Live agent scoring was **not** run (no Gemini / Anthropic / OpenAI "
+                "key in `.env`). Question bank + SQL ground truth are shipped; "
+                "re-run `make eval` after adding keys to fill accuracy / retries.",
                 "",
                 f"| Metric | Value |",
                 f"|--------|-------|",
