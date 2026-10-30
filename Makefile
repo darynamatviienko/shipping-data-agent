@@ -1,8 +1,11 @@
-.PHONY: setup etl test run
+.PHONY: setup data etl test run
 
 setup:
 	@test -d .venv || python3 -m venv .venv
 	.venv/bin/pip install -r requirements.txt
+
+data:
+	.venv/bin/python scripts/generate_synthetic_data.py
 
 etl:
 	@echo "Step 3 will implement ETL"

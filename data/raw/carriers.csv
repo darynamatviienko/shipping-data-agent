@@ -1,0 +1,6 @@
+carrier_id,name,hq_country,service_tier
+DHL,DHL Express,DE,express
+UPS,UPS Worldwide,US,express
+FDX,FedEx International,US,express
+TNT,TNT Express,NL,standard
+GLS,GLS Parcel,DE,economy
