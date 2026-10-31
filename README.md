@@ -156,7 +156,7 @@ All live cases passed.
 | `q15_invoice_discrepancies` | invoice_check | Find invoice discrepancies and report the count for each error type (duplicate_billing, wrong_weight_class, price_above_contract, nonexistent_shipment). | `duplicate_billing=292, nonexistent_shipment=145, price_above_contract=145, wrong_weight_class=146` |
 ## Limitations
 
-- Live accuracy / retry metrics are **pending** until an API key is added and `make eval` is re-run.
+- Latest live eval is **15/15 (100%)** with Gemini Flash-Lite; free-tier model quotas can still throttle demos (prefer `gemini-flash-lite-latest` over exhausted Flash SKUs).
 - Heuristic intent routing can misclassify edge-case questions; LLM classification helps only when a key is set.
 - SQL answers depend on the model writing valid, schema-aligned SELECT statements (guards + ≤2 retries mitigate but do not eliminate failures).
 - Synthetic data and a fixed seed — not production carrier feeds.
