@@ -225,7 +225,13 @@ def _connect(db_path: Path, *, timeout_ms: int) -> duckdb.DuckDBPyConnection:
         raise FileNotFoundError(
             f"Warehouse not found: {path}. Run `make etl` first."
         )
-    con = duckdb.connect(str(path), read_only=True)
+    # read_only blocks writes; enable_external_access=False blocks read_csv /
+    # parquet / httpfs file and network access even when the SQL guard slips.
+    con = duckdb.connect(
+        str(path),
+        read_only=True,
+        config={"enable_external_access": False},
+    )
     con.execute(f"SET max_execution_time = {int(timeout_ms)}")
     return con
 

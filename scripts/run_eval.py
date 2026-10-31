@@ -19,6 +19,7 @@ from shipping_data_agent.eval.harness import (
     format_readme_section,
     run_eval,
     save_results,
+    warehouse_display_path,
 )
 
 
@@ -96,6 +97,9 @@ def main(argv: list[str] | None = None) -> int:
     except RuntimeError as exc:
         print(f"{exc}", file=sys.stderr)
         return 2
+
+    # Always persist a repo-relative warehouse path (never absolute user home paths).
+    report.warehouse = warehouse_display_path(ROOT / "data" / "warehouse" / "shipping.duckdb")
 
     out = save_results(report, args.results)
     section = format_readme_section(report)

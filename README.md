@@ -123,6 +123,10 @@ make eval                # live agent scoring when keys present
 
 Results JSON: `data/eval/results.json` (last run: `2026-10-31T21:17:30.249916+00:00`).
 
+### How to read these results
+
+The 15 scored questions are fixed and fairly simple (mostly counts and aggregates). The grader was adjusted once after the first live run to accept humanized labels and number formats (see the `notes` field in `data/eval/results.json`). The score shows the pipeline works end to end. It does not mean the agent is production-ready.
+
 ### Latest metrics
 
 | Metric | Value |
@@ -159,13 +163,13 @@ All live cases passed.
 - Latest live eval is **15/15 (100%)** with Gemini Flash-Lite; free-tier model quotas can still throttle demos (prefer `gemini-flash-lite-latest` over exhausted Flash SKUs).
 - Heuristic intent routing can misclassify edge-case questions; LLM classification helps only when a key is set.
 - SQL answers depend on the model writing valid, schema-aligned SELECT statements (guards + ≤2 retries mitigate but do not eliminate failures).
-- Synthetic data and a fixed seed — not production carrier feeds.
+- Synthetic data and a fixed seed. Not production carrier feeds. The seed CSVs are structurally clean, so ETL rejects 0 rows on a real run; cleaning rules are checked by unit tests with deliberately broken input (`tests/test_etl_cleaning.py`), not by real-world dirty data.
 - Streamlit UI is a thin chat shell (no auth, history persistence, or multi-user sessions).
 - Single local DuckDB file; no concurrent write workload design.
 
 ## What I would do next
 
-1. Run live eval with Gemini and tune prompts / few-shots until accuracy is interview-ready.
+1. Expand the eval to 50+ questions, including harder ones (multi-table joins, relative date periods, ambiguous wording).
 2. Persist chat history and show the SQL / tool used under each answer in the UI.
 3. Add a small retrieval or schema-card cache so write_sql stays stable as the warehouse grows.
 4. Expand the discrepancy tool with dollar impact and shipment-level drill-down.

@@ -27,11 +27,17 @@ def warehouse() -> Path:
     return WAREHOUSE
 
 
-def test_eval_bank_has_fifteen_questions():
+def test_eval_bank_has_expected_questions():
     bank = get_eval_questions()
-    assert len(bank) == 15
-    assert len({q.id for q in bank}) == 15
+    assert len(bank) == 20
+    assert len({q.id for q in bank}) == 20
     assert bank is EVAL_QUESTIONS
+    assert {q.id for q in bank} >= {
+        "q01_shipment_count",
+        "q15_invoice_discrepancies",
+        "q16_top_carrier_avg_delivery_per_country",
+        "q20_shipments_without_invoice",
+    }
 
 
 def test_ground_truth_sql_runs(warehouse: Path):
@@ -118,11 +124,14 @@ def test_sql_rows_to_expected_helpers():
 
 def test_run_eval_ground_truth_only(warehouse: Path):
     report = run_eval(db_path=warehouse, live=False)
-    assert report.question_count == 15
+    assert report.question_count == 20
     assert report.live_agent_run is False
-    assert report.skipped == 15
+    assert report.skipped == 20
     assert report.accuracy is None
     assert all(c.expected_display for c in report.cases)
+    assert report.warehouse == "data/warehouse/shipping.duckdb"
+    assert "/home/" not in report.warehouse
+    assert "/Users/" not in report.warehouse
     md = format_readme_section(report)
     assert "## Evaluation (Step 6)" in md
     assert "q01_shipment_count" in md

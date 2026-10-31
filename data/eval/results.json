@@ -1,6 +1,6 @@
 {
   "ran_at": "2026-10-31T21:17:30.249916+00:00",
-  "warehouse": "/home/dmatviienko/Documents/ShippingDataAgent/data/warehouse/shipping.duckdb",
+  "warehouse": "data/warehouse/shipping.duckdb",
   "llm_configured": true,
   "live_agent_run": true,
   "question_count": 15,
