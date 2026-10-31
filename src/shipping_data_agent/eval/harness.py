@@ -1,4 +1,4 @@
-"""Run the 15-question eval: SQL ground truth + optional live agent scoring."""
+"""Run the eval bank: SQL ground truth + optional live agent scoring."""
 
 from __future__ import annotations
 
@@ -16,6 +16,19 @@ from shipping_data_agent.tools.warehouse_tools import DEFAULT_DB_PATH
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RESULTS_PATH = ROOT / "data" / "eval" / "results.json"
+# Repo-relative path written into results.json (never an absolute home path).
+WAREHOUSE_RELATIVE = "data/warehouse/shipping.duckdb"
+
+
+def warehouse_display_path(path: Path, *, root: Path | None = None) -> str:
+    """Return a project-relative warehouse path for reports and JSON output."""
+    base = (root or ROOT).resolve()
+    resolved = Path(path).resolve()
+    try:
+        return resolved.relative_to(base).as_posix()
+    except ValueError:
+        # Outside the repo: fall back to the known relative default name.
+        return WAREHOUSE_RELATIVE
 
 
 @dataclass
@@ -62,7 +75,12 @@ def compute_ground_truth(
     db_path: Path,
 ) -> dict[str, Any]:
     """Execute the question's SQL against DuckDB and return grader payload."""
-    con = duckdb.connect(str(db_path), read_only=True)
+    # Ground-truth SQL is ours, not agent-authored, but keep the same lockdown.
+    con = duckdb.connect(
+        str(db_path),
+        read_only=True,
+        config={"enable_external_access": False},
+    )
     try:
         cursor = con.execute(question.sql)
         columns = [d[0] for d in cursor.description]
@@ -103,7 +121,7 @@ def run_eval(
 
     report = EvalReport(
         ran_at=datetime.now(timezone.utc).isoformat(),
-        warehouse=str(path),
+        warehouse=warehouse_display_path(path),
         llm_configured=keys_ok,
         live_agent_run=do_live,
         question_count=len(bank),

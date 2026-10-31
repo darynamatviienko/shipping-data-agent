@@ -48,12 +48,34 @@ _FORBIDDEN = frozenset(
     }
 )
 
+# DuckDB table functions / scanners that can read files or the network.
+# Matched as whole identifiers so normal analytic SQL stays allowed.
+_FORBIDDEN_TABLE_FUNCS = frozenset(
+    {
+        "READ_CSV",
+        "READ_CSV_AUTO",
+        "READ_PARQUET",
+        "READ_JSON",
+        "READ_JSON_AUTO",
+        "READ_TEXT",
+        "READ_BLOB",
+        "GLOB",
+        "PARQUET_SCAN",
+        "SNIFF_CSV",
+        "HTTPFS",
+    }
+)
+
 _COMMENT_LINE = re.compile(r"--.*?$", re.MULTILINE)
 _COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.DOTALL)
 _STRING = re.compile(
     r"('(?:''|[^'])*')|(\"(?:\"\"|[^\"])*\")",
 )
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# Catch httpfs-style URLs even when they sit inside string literals.
+_EXTERNAL_URL = re.compile(
+    r"(?i)(?:https?|s3|azure|gcs|file|hf|abfs|abfss)://"
+)
 
 
 class SqlGuardError(ValueError):
@@ -87,6 +109,12 @@ def validate_readonly_select(query: str) -> str:
     if ";" in body:
         raise SqlGuardError("Only a single SQL statement is allowed")
 
+    # URLs are often inside quotes; scan the raw body before string stripping.
+    if _EXTERNAL_URL.search(body):
+        raise SqlGuardError(
+            "External URLs / remote filesystems are not allowed in read-only SQL"
+        )
+
     scanned = _strip_comments_and_strings(body)
     if not scanned.strip():
         raise SqlGuardError("Query must be a non-empty SELECT statement")
@@ -104,6 +132,12 @@ def validate_readonly_select(query: str) -> str:
     if forbidden_hit is not None:
         raise SqlGuardError(
             f"Forbidden SQL keyword for read-only tool: {forbidden_hit}"
+        )
+
+    file_fn = next((t for t in tokens if t in _FORBIDDEN_TABLE_FUNCS), None)
+    if file_fn is not None:
+        raise SqlGuardError(
+            f"Forbidden DuckDB file/network function for read-only tool: {file_fn}"
         )
 
     # WITH queries must eventually select; reject WITH-only nonsense lightly.

@@ -32,7 +32,7 @@ flowchart LR
   end
 
   LLM[LLM: Gemini / Anthropic / OpenAI]
-  Eval[15-question eval harness]
+  Eval[Eval harness + SQL ground truth]
 
   CLI --> U
   ST --> U
@@ -49,9 +49,9 @@ flowchart LR
 |-------|------|
 | `data/raw` + `scripts/generate_synthetic_data.py` | ~20k shipments, carriers, contract rates, invoices (~3% injected faults) |
 | `src/.../etl` | Clean + load star schema into DuckDB |
-| `src/.../tools` | Read-only `run_sql`, `get_schema`, `find_invoice_discrepancies` |
+| `src/.../tools` | Read-only `run_sql`, `get_schema`, `find_invoice_discrepancies` (SQL guard + `enable_external_access=false`) |
 | `src/.../agent` | Explicit LangGraph: understand → SQL path or discrepancy → summarise/refuse |
-| `src/.../eval` | 15 fixed questions graded against DuckDB SQL answers |
+| `src/.../eval` | Question bank with DuckDB SQL ground truth (20 in code; latest live scoreboard is 15) |
 | CLI / Streamlit | Ask questions without writing Python |
 
 ## How to run (3 commands)
@@ -97,7 +97,7 @@ make ask Q='Find invoice discrepancies and summarise the error types'
 ```
 src/shipping_data_agent/
   agent/     # LangGraph + LLM factory (Anthropic / OpenAI / Gemini)
-  eval/      # 15-question bank + grading harness
+  eval/      # Question bank + grading harness
   tools/     # Read-only SQL / schema / discrepancy tools
   etl/       # Cleaning + DuckDB load
 scripts/     # generate_synthetic_data, run_etl, ask_agent, run_eval, streamlit_app
@@ -107,9 +107,16 @@ data/eval/   # Eval results JSON
 tests/
 ```
 
+### SQL safety (agent tools)
+
+- Only a single `SELECT` / `WITH … SELECT` passes the guard (`tools/guards.py`).
+- Writes, multi-statements, and DuckDB file/network readers (`read_csv`, parquet, URLs, …) are rejected.
+- Warehouse connections used by the agent/eval tools open with `read_only=True` and `enable_external_access=False`.
+- Results are capped (`row_limit=200` by default) and timed out (`max_execution_time`, default 5s).
+
 ## Evaluation (Step 6)
 
-Fifteen fixed questions with answers computed directly in SQL against DuckDB. The harness runs the LangGraph agent (when LLM keys are set), grades free-text answers against those ground-truth values, and reports accuracy, failed cases, and average SQL retries.
+The question bank in `eval/questions.py` currently has **20** items with answers computed in SQL against DuckDB. The latest **live** agent scoreboard below covers the original **15** (q01–q15). Five harder questions (q16–q20) have ground-truth SQL in code but are not in the live metrics until you re-run `make eval`. The harness grades free-text answers against those ground-truth values and reports accuracy, failed cases, and average SQL retries.
 
 ### How to run
 
@@ -122,6 +129,10 @@ make eval                # live agent scoring when keys present
 ```
 
 Results JSON: `data/eval/results.json` (last run: `2026-10-31T21:17:30.249916+00:00`).
+
+### How to read these results
+
+The 15 scored questions are fixed and fairly simple (mostly counts and aggregates). The grader was adjusted once after the first live run to accept humanized labels and number formats (see the `notes` field in `data/eval/results.json`). The score shows the pipeline works end to end. It does not mean the agent is production-ready.
 
 ### Latest metrics
 
@@ -154,18 +165,21 @@ All live cases passed.
 | `q13_max_weight` | sql_qa | What is the maximum shipment weight_kg, rounded to 2 decimals? | `119.99` |
 | `q14_contract_rate_rows` | sql_qa | How many contract rate rows are in the warehouse? | `250` |
 | `q15_invoice_discrepancies` | invoice_check | Find invoice discrepancies and report the count for each error type (duplicate_billing, wrong_weight_class, price_above_contract, nonexistent_shipment). | `duplicate_billing=292, nonexistent_shipment=145, price_above_contract=145, wrong_weight_class=146` |
+
+Harder items in code only (not live-scored yet): `q16_top_carrier_avg_delivery_per_country`, `q17_delayed_share_per_carrier`, `q18_mom_billed_jan2025`, `q19_over_contract_by_carrier`, `q20_shipments_without_invoice`.
+
 ## Limitations
 
 - Latest live eval is **15/15 (100%)** with Gemini Flash-Lite; free-tier model quotas can still throttle demos (prefer `gemini-flash-lite-latest` over exhausted Flash SKUs).
 - Heuristic intent routing can misclassify edge-case questions; LLM classification helps only when a key is set.
 - SQL answers depend on the model writing valid, schema-aligned SELECT statements (guards + ≤2 retries mitigate but do not eliminate failures).
-- Synthetic data and a fixed seed — not production carrier feeds.
+- Synthetic data and a fixed seed. Not production carrier feeds. The seed CSVs are structurally clean, so ETL rejects 0 rows on a real run; cleaning rules are checked by unit tests with deliberately broken input (`tests/test_etl_cleaning.py`), not by real-world dirty data.
 - Streamlit UI is a thin chat shell (no auth, history persistence, or multi-user sessions).
 - Single local DuckDB file; no concurrent write workload design.
 
 ## What I would do next
 
-1. Run live eval with Gemini and tune prompts / few-shots until accuracy is interview-ready.
+1. Expand the eval to 50+ questions, including harder ones (multi-table joins, relative date periods, ambiguous wording).
 2. Persist chat history and show the SQL / tool used under each answer in the UI.
 3. Add a small retrieval or schema-card cache so write_sql stays stable as the warehouse grows.
 4. Expand the discrepancy tool with dollar impact and shipment-level drill-down.

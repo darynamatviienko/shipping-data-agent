@@ -73,6 +73,73 @@ def test_validate_rejects_non_readonly(query: str):
         validate_readonly_select(query)
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "SELECT * FROM read_csv('/etc/hostname')",
+        "SELECT * FROM read_csv_auto('/etc/passwd')",
+        "SELECT * FROM read_parquet('/tmp/x.parquet')",
+        "SELECT * FROM read_json('/tmp/x.json')",
+        "SELECT * FROM read_json_auto('/tmp/x.json')",
+        "SELECT * FROM read_text('/etc/hostname')",
+        "SELECT * FROM read_blob('/etc/hostname')",
+        "SELECT * FROM glob('/etc/*')",
+        "SELECT * FROM parquet_scan('/tmp/x.parquet')",
+        "SELECT * FROM sniff_csv('/tmp/x.csv')",
+        "SELECT * FROM read_csv('https://example.com/data.csv')",
+        "SELECT * FROM 's3://bucket/key.parquet'",
+    ],
+)
+def test_validate_rejects_file_and_network_readers(query: str):
+    with pytest.raises(SqlGuardError, match="Forbidden|External URL|file/network"):
+        validate_readonly_select(query)
+
+
+def test_run_sql_rejects_file_read_via_guard():
+    with pytest.raises(SqlGuardError, match="Forbidden|External URL|file/network"):
+        run_sql("SELECT * FROM read_csv('/etc/hostname')")
+
+
+def test_connection_blocks_external_file_reads():
+    """Defense in depth: DuckDB config blocks file reads even without the guard."""
+    from shipping_data_agent.tools.warehouse_tools import DEFAULT_TIMEOUT_MS, _connect
+
+    con = _connect(WAREHOUSE, timeout_ms=DEFAULT_TIMEOUT_MS)
+    try:
+        with pytest.raises(duckdb.Error, match="file system operations are disabled|Permission"):
+            con.execute("SELECT * FROM read_csv('/etc/hostname')")
+    finally:
+        con.close()
+
+
+def test_run_sql_allows_normal_analytics():
+    count = run_sql("SELECT COUNT(*) AS n FROM fact_shipments")
+    assert count["row_count"] == 1
+    assert count["rows"][0]["n"] == 20000
+
+    joined = run_sql(
+        """
+        SELECT c.carrier_id, COUNT(*) AS n
+        FROM fact_shipments s
+        JOIN dim_carrier c ON s.carrier_sk = c.carrier_sk
+        GROUP BY c.carrier_id
+        ORDER BY c.carrier_id
+        """
+    )
+    assert joined["row_count"] == 5
+    assert joined["truncated"] is False
+
+    cte = run_sql(
+        """
+        WITH delayed AS (
+          SELECT shipment_id FROM fact_shipments WHERE status = 'delayed'
+        )
+        SELECT COUNT(*) AS n FROM delayed
+        """
+    )
+    assert cte["rows"][0]["n"] == 1437
+
+
 def test_run_sql_rejects_write_attempt():
     with pytest.raises(SqlGuardError, match="Forbidden|read-only|SELECT"):
         run_sql("DELETE FROM fact_invoices WHERE 1=1")
