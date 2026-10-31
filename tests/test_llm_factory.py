@@ -10,7 +10,9 @@ from shipping_data_agent.agent.llm import LlmConfigError, clear_chat_model_cache
 
 @pytest.fixture(autouse=True)
 def _clear_cache_and_env(monkeypatch):
+    """Isolate from a real developer .env (load_dotenv would refill delenv'd keys)."""
     clear_chat_model_cache()
+    # Empty strings beat load_dotenv(override=False); delenv alone is not enough.
     for key in (
         "LLM_PROVIDER",
         "ANTHROPIC_API_KEY",
@@ -21,7 +23,7 @@ def _clear_cache_and_env(monkeypatch):
         "OPENAI_MODEL",
         "GEMINI_MODEL",
     ):
-        monkeypatch.delenv(key, raising=False)
+        monkeypatch.setenv(key, "")
     yield
     clear_chat_model_cache()
 
@@ -54,10 +56,10 @@ def test_resolve_provider_auto_gemini(monkeypatch):
 def test_get_chat_model_gemini_builds_without_network(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key-not-real")
-    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.0-flash")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-flash-lite-latest")
     model = llm_mod.get_chat_model()
     assert model.__class__.__name__ == "ChatGoogleGenerativeAI"
-    assert getattr(model, "model", None) == "gemini-2.0-flash"
+    assert getattr(model, "model", None) == "gemini-flash-lite-latest"
 
 
 def test_get_chat_model_gemini_accepts_google_api_key(monkeypatch):

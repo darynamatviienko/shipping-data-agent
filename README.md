@@ -76,7 +76,7 @@ make test
 1. Copy `.env.example` → `.env`.
 2. Set **`LLM_PROVIDER=gemini`** (already the example default).
 3. Set **`GEMINI_API_KEY=`** *or* **`GOOGLE_API_KEY=`** (the factory accepts either; do not commit real keys).
-4. Optional: `GEMINI_MODEL=gemini-2.0-flash` (default).
+4. Optional: `GEMINI_MODEL=gemini-flash-lite-latest` (default; stable Flash-Lite alias).
 
 Anthropic (`ANTHROPIC_API_KEY`) and OpenAI (`OPENAI_API_KEY`) paths still work if you set `LLM_PROVIDER` accordingly. Keys are never hardcoded.
 
@@ -121,19 +121,19 @@ make eval                # live agent scoring when keys present
 .venv/bin/python scripts/run_eval.py --ground-truth-only
 ```
 
-Results JSON: `data/eval/results.json`.
+Results JSON: `data/eval/results.json` (last run: `2026-10-31T21:17:30.249916+00:00`).
 
 ### Latest metrics
-
-Live agent scoring was **not** run (no Gemini / Anthropic / OpenAI key in `.env`). Question bank + SQL ground truth are shipped; re-run `make eval` after adding keys to fill accuracy / retries.
 
 | Metric | Value |
 |--------|-------|
 | Questions | 15 |
-| Accuracy | _pending live run_ |
-| Failed | _pending live run_ |
-| Average SQL retries | _pending live run_ |
-| LLM configured | False |
+| Accuracy | 100.0% (15/15) |
+| Failed | 0 |
+| Average SQL retries | 0.00 |
+| LLM configured | True |
+
+All live cases passed.
 
 ### Question bank (SQL ground truth)
 
@@ -154,7 +154,6 @@ Live agent scoring was **not** run (no Gemini / Anthropic / OpenAI key in `.env`
 | `q13_max_weight` | sql_qa | What is the maximum shipment weight_kg, rounded to 2 decimals? | `119.99` |
 | `q14_contract_rate_rows` | sql_qa | How many contract rate rows are in the warehouse? | `250` |
 | `q15_invoice_discrepancies` | invoice_check | Find invoice discrepancies and report the count for each error type (duplicate_billing, wrong_weight_class, price_above_contract, nonexistent_shipment). | `duplicate_billing=292, nonexistent_shipment=145, price_above_contract=145, wrong_weight_class=146` |
-
 ## Limitations
 
 - Live accuracy / retry metrics are **pending** until an API key is added and `make eval` is re-run.

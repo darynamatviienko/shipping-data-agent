@@ -33,8 +33,51 @@ def answer_contains_number(answer: str, expected: float) -> bool:
     return any(numbers_close(n, float(expected)) for n in extract_numbers(answer))
 
 
+# Humanized aliases the summariser often uses instead of warehouse codes.
+_TOKEN_ALIASES: dict[str, tuple[str, ...]] = {
+    "fdx": ("fdx", "fedex", "fedex international"),
+    "dhl": ("dhl", "dhl express"),
+    "ups": ("ups", "ups worldwide"),
+    "tnt": ("tnt", "tnt express"),
+    "gls": ("gls", "gls parcel"),
+    "medium_box": ("medium_box", "medium box", "medium-box"),
+    "small_box": ("small_box", "small box", "small-box"),
+    "large_box": ("large_box", "large box", "large-box"),
+    "duplicate_billing": ("duplicate_billing", "duplicate billing", "duplicate-billing"),
+    "wrong_weight_class": (
+        "wrong_weight_class",
+        "wrong weight class",
+        "wrong-weight-class",
+        "wrong weight",
+    ),
+    "price_above_contract": (
+        "price_above_contract",
+        "price above contract",
+        "price-above-contract",
+        "above contract",
+    ),
+    "nonexistent_shipment": (
+        "nonexistent_shipment",
+        "nonexistent shipment",
+        "non-existent shipment",
+        "non existent shipment",
+    ),
+}
+
+
 def answer_contains_token(answer: str, token: str) -> bool:
-    return str(token).lower() in (answer or "").lower()
+    """True if answer contains token or a known humanized alias."""
+    text = (answer or "").lower()
+    raw = str(token).lower()
+    if raw in text:
+        return True
+    for alias in _TOKEN_ALIASES.get(raw, ()):
+        if alias in text:
+            return True
+    # Underscore ↔ space soft match for unknown snake_case labels.
+    if "_" in raw and raw.replace("_", " ") in text:
+        return True
+    return False
 
 
 def sql_rows_to_expected(

@@ -69,7 +69,7 @@ def get_chat_model() -> BaseChatModel:
             )
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        model = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
         return ChatGoogleGenerativeAI(
             model=model, google_api_key=api_key, temperature=0
         )

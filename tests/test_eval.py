@@ -79,6 +79,31 @@ def test_grade_scalar_and_discrepancy(warehouse: Path):
     good = grade_answer(q_disc, disc_expected, "Discrepancies — " + "; ".join(parts))
     assert good.passed
 
+    # Summariser often humanizes codes (FedEx / medium box / Duplicate billing).
+    human = grade_answer(
+        q_disc,
+        disc_expected,
+        "Duplicate billing: 292; Wrong weight class: 146; "
+        "Nonexistent shipment: 145; Price above contract: 145",
+    )
+    assert human.passed
+
+    q_rows = next(q for q in get_eval_questions() if q.id == "q06_top_carriers_by_shipments")
+    rows_expected = compute_ground_truth(q_rows, db_path=warehouse)
+    named = grade_answer(
+        q_rows,
+        rows_expected,
+        "FedEx International 4068, TNT Express 4002, UPS Worldwide 3998, "
+        "DHL Express 3979, GLS Parcel 3953",
+    )
+    assert named.passed
+
+    q_parcel = next(q for q in get_eval_questions() if q.id == "q12_top_parcel_type")
+    parcel_expected = compute_ground_truth(q_parcel, db_path=warehouse)
+    assert grade_answer(
+        q_parcel, parcel_expected, "Most common is medium box with 5981 shipments."
+    ).passed
+
 
 def test_sql_rows_to_expected_helpers():
     scalar = sql_rows_to_expected("scalar", ["n"], [(42,)])

@@ -1,15 +1,15 @@
 {
-  "ran_at": "2026-10-30T15:50:57.989695+00:00",
+  "ran_at": "2026-10-31T21:17:30.249916+00:00",
   "warehouse": "/home/dmatviienko/Documents/ShippingDataAgent/data/warehouse/shipping.duckdb",
-  "llm_configured": false,
-  "live_agent_run": false,
+  "llm_configured": true,
+  "live_agent_run": true,
   "question_count": 15,
-  "answered": 0,
-  "correct": 0,
+  "answered": 15,
+  "correct": 15,
   "failed": 0,
-  "skipped": 15,
-  "accuracy": null,
-  "average_retries": null,
+  "skipped": 0,
+  "accuracy": 1.0,
+  "average_retries": 0.0,
   "cases": [
     {
       "id": "q01_shipment_count",
@@ -18,13 +18,13 @@
       "kind": "scalar",
       "expected_display": "20000",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM fact_shipments",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There are 20,000 shipments in the warehouse.\n\nSQL used:\n```sql\nSELECT count(*) AS shipment_count\nFROM fact_shipments\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q02_delivered_germany",
@@ -33,13 +33,13 @@
       "kind": "scalar",
       "expected_display": "1472",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM fact_shipments s JOIN dim_country c ON s.country_sk = c.country_sk WHERE c.country_code = 'DE' AND s.status = 'delivered'",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There were 1,472 shipments delivered to Germany.\n\nSQL used:\n```sql\nSELECT count(*) AS delivered_shipments_to_germany\nFROM fact_shipments f\nJOIN dim_country c ON f.country_sk = c.country_sk\nWHERE (c.country_name = 'Germany' OR c.country_code = 'DE')\n  AND f.status = 'delivered'\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q03_invoice_count",
@@ -48,13 +48,13 @@
       "kind": "scalar",
       "expected_display": "19679",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM fact_invoices",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There are 19,679 invoices.\n\nSQL used:\n```sql\nSELECT count(*) AS invoice_count\nFROM fact_invoices\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q04_total_billed",
@@ -63,13 +63,13 @@
       "kind": "scalar",
       "expected_display": "624580.26",
       "ground_truth_sql": "SELECT ROUND(SUM(billed_price), 2) AS total_eur FROM fact_invoices",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "The total billed amount across all invoices is €624,580.26.\n\nSQL used:\n```sql\nSELECT ROUND(SUM(billed_price), 2) AS total_billed_amount_eur\nFROM fact_invoices\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q05_avg_delivery_by_carrier",
@@ -78,13 +78,13 @@
       "kind": "rows",
       "expected_display": "carrier_id=DHL, avg_delivery_days=6.68; carrier_id=FDX, avg_delivery_days=6.57; carrier_id=GLS, avg_delivery_days=6.65; carrier_id=TNT, avg_delivery_days=6.6; carrier_id=UPS, avg_delivery_days=6.56",
       "ground_truth_sql": "SELECT dc.carrier_id, ROUND(AVG(s.delivery_days), 2) AS avg_delivery_days FROM fact_shipments s JOIN dim_carrier dc ON s.carrier_sk = dc.carrier_sk WHERE s.status <> 'cancelled' GROUP BY dc.carrier_id ORDER BY dc.carrier_id",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "Based on the data provided, here is the average number of delivery days by carrier (excluding cancelled shipments):\n\n* **UPS Worldwide:** 6.56 days\n* **FedEx International:** 6.57 days\n* **TNT Express:** 6.60 days\n* **GLS Parcel:** 6.65 days\n* **DHL Express:** 6.68 days\n\nSQL used:\n```sql\nSELECT \n    c.name AS carrier_name,\n    ROUND(AVG(s.delivery_days), 2) AS average_delivery_days\nFROM fact_shipments s\nJOIN dim_carrier c ON s.carrier_sk = c.carrier_sk\nWHERE s.status <> 'cancelled'\nGROUP BY c.name\nORDER BY average_delivery_days\n```",
+      "passed": true,
+      "grade_reason": "row match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q06_top_carriers_by_shipments",
@@ -93,13 +93,13 @@
       "kind": "rows",
       "expected_display": "carrier_id=FDX, shipment_count=4068; carrier_id=TNT, shipment_count=4002; carrier_id=UPS, shipment_count=3998; carrier_id=DHL, shipment_count=3979; carrier_id=GLS, shipment_count=3953",
       "ground_truth_sql": "SELECT dc.carrier_id, COUNT(*) AS shipment_count FROM fact_shipments s JOIN dim_carrier dc ON s.carrier_sk = dc.carrier_sk GROUP BY dc.carrier_id ORDER BY shipment_count DESC, dc.carrier_id LIMIT 5",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "The top 5 carriers by shipment count are:\n\n1. FedEx International: 4,068 shipments\n2. TNT Express: 4,002 shipments\n3. UPS Worldwide: 3,998 shipments\n4. DHL Express: 3,979 shipments\n5. GLS Parcel: 3,953 shipments\n\nSQL used:\n```sql\nSELECT \n    c.name AS carrier_name,\n    COUNT(s.shipment_id) AS shipment_count\nFROM fact_shipments s\nJOIN dim_carrier c ON s.carrier_sk = c.carrier_sk\nGROUP BY c.name\nORDER BY shipment_count DESC\nLIMIT 5\n```",
+      "passed": true,
+      "grade_reason": "row match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q07_delayed_count",
@@ -108,13 +108,13 @@
       "kind": "scalar",
       "expected_display": "1437",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM fact_shipments WHERE status = 'delayed'",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There are 1,437 shipments with a status of delayed.\n\nSQL used:\n```sql\nSELECT count(*) AS delayed_shipments_count\nFROM fact_shipments\nWHERE status = 'delayed'\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q08_avg_weight",
@@ -123,13 +123,13 @@
       "kind": "scalar",
       "expected_display": "16.74",
       "ground_truth_sql": "SELECT ROUND(AVG(weight_kg), 2) AS avg_weight_kg FROM fact_shipments",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "The average shipment weight is 16.74 kg.\n\nSQL used:\n```sql\nSELECT ROUND(AVG(weight_kg), 2) AS avg_weight_kg\nFROM fact_shipments\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q09_carrier_dim_count",
@@ -138,13 +138,13 @@
       "kind": "scalar",
       "expected_display": "5",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM dim_carrier",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There are 5 carriers in the carrier dimension.\n\nSQL used:\n```sql\nSELECT count(*) AS carrier_count\nFROM dim_carrier\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q10_shipments_2024",
@@ -153,13 +153,13 @@
       "kind": "scalar",
       "expected_display": "10109",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM fact_shipments s JOIN dim_date d ON s.date_sk = d.date_sk WHERE d.year = 2024",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There were 10,109 shipments shipped in the calendar year 2024.\n\nSQL used:\n```sql\nSELECT count(*) AS shipment_count\nFROM fact_shipments s\nJOIN dim_date d ON s.date_sk = d.date_sk\nWHERE d.year = 2024\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q11_dhl_invoices",
@@ -168,13 +168,13 @@
       "kind": "scalar",
       "expected_display": "3929",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM fact_invoices i JOIN dim_carrier c ON i.carrier_sk = c.carrier_sk WHERE c.carrier_id = 'DHL'",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There were 3,929 invoices billed by DHL.\n\nSQL used:\n```sql\nSELECT count(*) AS invoice_count\nFROM fact_invoices fi\nJOIN dim_carrier dc ON fi.carrier_sk = dc.carrier_sk\nWHERE dc.carrier_id = 'DHL'\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q12_top_parcel_type",
@@ -183,13 +183,13 @@
       "kind": "rows",
       "expected_display": "parcel_type=medium_box, n=5981",
       "ground_truth_sql": "SELECT parcel_type, COUNT(*) AS n FROM fact_shipments GROUP BY parcel_type ORDER BY n DESC, parcel_type LIMIT 1",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "The most common parcel type is a medium box, which is used by 5,981 shipments.\n\nSQL used:\n```sql\nSELECT parcel_type, COUNT(*) AS shipment_count\nFROM fact_shipments\nGROUP BY parcel_type\nORDER BY shipment_count DESC\nLIMIT 1\n```",
+      "passed": true,
+      "grade_reason": "row match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q13_max_weight",
@@ -198,13 +198,13 @@
       "kind": "scalar",
       "expected_display": "119.99",
       "ground_truth_sql": "SELECT ROUND(MAX(weight_kg), 2) AS max_weight_kg FROM fact_shipments",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "The maximum shipment weight is 119.99 kg.\n\nSQL used:\n```sql\nSELECT ROUND(MAX(weight_kg), 2) AS max_weight_kg\nFROM fact_shipments\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q14_contract_rate_rows",
@@ -213,13 +213,13 @@
       "kind": "scalar",
       "expected_display": "250",
       "ground_truth_sql": "SELECT COUNT(*) AS n FROM fact_contract_rates",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "There are 250 contract rate rows in the warehouse.\n\nSQL used:\n```sql\nSELECT count(*) AS contract_rate_count\nFROM fact_contract_rates\n```",
+      "passed": true,
+      "grade_reason": "scalar match",
+      "retries": 0,
+      "agent_intent": "sql_qa",
       "error": null,
-      "skipped": true
+      "skipped": false
     },
     {
       "id": "q15_invoice_discrepancies",
@@ -228,14 +228,14 @@
       "kind": "discrepancy",
       "expected_display": "duplicate_billing=292, nonexistent_shipment=145, price_above_contract=145, wrong_weight_class=146",
       "ground_truth_sql": "WITH invoice_enriched AS ( SELECT i.invoice_id, i.shipment_id, i.billed_price, s.shipment_id AS matched_shipment, s.weight_kg, s.carrier_sk, s.country_sk, r.rate_eur, r.weight_band AS expected_band, CASE dc.country_code WHEN 'DE' THEN 1.00 WHEN 'NL' THEN 1.02 WHEN 'BE' THEN 1.05 WHEN 'FR' THEN 1.08 WHEN 'PL' THEN 0.95 WHEN 'CZ' THEN 0.93 WHEN 'IT' THEN 1.12 WHEN 'ES' THEN 1.10 WHEN 'GB' THEN 1.18 WHEN 'US' THEN 1.35 ELSE 1.00 END AS country_mult, CASE WHEN r.max_kg IS NULL THEN r.min_kg + 10.0 ELSE (r.min_kg + r.max_kg) / 2.0 END AS ref_kg FROM fact_invoices i LEFT JOIN fact_shipments s ON i.shipment_id = s.shipment_id LEFT JOIN dim_country dc ON s.country_sk = dc.country_sk LEFT JOIN fact_contract_rates r ON r.carrier_sk = s.carrier_sk AND r.country_sk = s.country_sk AND s.weight_kg >= r.min_kg AND (r.max_kg IS NULL OR s.weight_kg < r.max_kg) ), with_expected AS ( SELECT *, CASE WHEN rate_eur IS NOT NULL THEN rate_eur + (weight_kg - ref_kg) * 0.35 * country_mult END AS expected_rate FROM invoice_enriched ), dupes AS ( SELECT shipment_id FROM fact_invoices GROUP BY shipment_id HAVING COUNT(*) > 1 ), other_bands AS ( SELECT e.invoice_id, MIN(ABS(e.billed_price - o.rate_eur)) AS min_other_diff FROM with_expected e JOIN fact_contract_rates o ON o.carrier_sk = e.carrier_sk AND o.country_sk = e.country_sk AND o.weight_band <> e.expected_band WHERE e.matched_shipment IS NOT NULL GROUP BY e.invoice_id ), classified AS ( SELECT e.invoice_id, e.shipment_id, e.billed_price, e.expected_rate, CASE WHEN e.matched_shipment IS NULL THEN 'nonexistent_shipment' WHEN d.shipment_id IS NOT NULL THEN 'duplicate_billing' WHEN e.expected_rate IS NOT NULL AND ABS(e.billed_price - e.expected_rate) / NULLIF(e.expected_rate, 0) > 0.02 AND ob.min_other_diff IS NOT NULL AND ob.min_other_diff <= 0.01 THEN 'wrong_weight_class' WHEN e.expected_rate IS NOT NULL AND e.billed_price > e.expected_rate * 1.10 THEN 'price_above_contract' ELSE NULL END AS error_type FROM with_expected e LEFT JOIN dupes d ON e.shipment_id = d.shipment_id LEFT JOIN other_bands ob ON e.invoice_id = ob.invoice_id ) SELECT error_type, COUNT(*) AS discrepancy_count, ROUND(SUM(billed_price), 2) AS total_billed_eur, ROUND(AVG(billed_price), 2) AS avg_billed_eur FROM classified WHERE error_type IS NOT NULL GROUP BY error_type ORDER BY error_type",
-      "agent_answer": null,
-      "passed": null,
-      "grade_reason": null,
-      "retries": null,
-      "agent_intent": null,
+      "agent_answer": "Based on the analysis of the invoice data, here is a summary of the discrepancies found by error type:\n\n* **Duplicate billing:** 292 instances (totaling €9,204.64)\n* **Wrong weight class:** 146 instances (totaling €5,613.26)\n* **Nonexistent shipment:** 145 instances (totaling €5,862.66)\n* **Price above contract:** 145 instances (totaling €5,343.77)\n\nThese results came from the `find_invoice_discrepancies` tool (curated SQL).",
+      "passed": true,
+      "grade_reason": "discrepancy match",
+      "retries": 0,
+      "agent_intent": "invoice_check",
       "error": null,
-      "skipped": true
+      "skipped": false
     }
   ],
-  "notes": "LLM keys missing or --ground-truth-only: shipped question bank + SQL ground truth only. Re-run with keys for accuracy / retries."
+  "notes": "Live agent scoring completed (regraded with humanized-token aliases)."
 }
